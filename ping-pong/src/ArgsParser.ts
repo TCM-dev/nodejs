@@ -9,6 +9,7 @@ export interface IArgsParser {
    * @memberof IArgsParser
    */
   isServer(): boolean;
+
   /**
    * Renvoie le numéro de port sur lequel écouter les connexions entrantes
    * La valeur est le premier nombre compris entre 10000 et 65535 qui aura été éventuellement transmis sur la ligne de commande.
@@ -18,6 +19,7 @@ export interface IArgsParser {
    * @memberof IArgsParser
    */
   getListeningPort(): number;
+
   /**
    * Renvoie la première adresse IPv4 transmise sur la ligne de commande.
    * Si aucune adresse IPv4 n'a été transmise sur la ligne de commande, renvoyer FALSE
@@ -40,19 +42,19 @@ export class ArgsParser implements IArgsParser {
   }
 
   getListeningPort(): number {
-    const listeningPort = this.args.find((arg) => {
-      const argInt = parseInt(arg);
-
-      if (argInt > 10000 && argInt < 65535) {
-        return argInt;
-      }
-    });
+    const listeningPort = this.args
+      .map((arg) => parseInt(arg))
+      .find((arg) => {
+        if (arg > 10000 && arg < 65535) {
+          return arg;
+        }
+      });
 
     if (!listeningPort) {
       return 23456;
     }
 
-    return parseInt(listeningPort);
+    return listeningPort;
   }
 
   getAddress(): string | false {
