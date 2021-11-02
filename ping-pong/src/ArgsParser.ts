@@ -46,7 +46,7 @@ export class ArgsParser implements IArgsParser {
       .map((arg) => parseInt(arg))
       .find((arg) => {
         if (arg > 10000 && arg < 65535) {
-          return arg;
+          return true;
         }
       });
 
