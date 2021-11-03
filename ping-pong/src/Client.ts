@@ -64,7 +64,7 @@ export class Client implements IClient {
 
     socket.connect({
       port: this.port,
-      path: this.address,
+      host: this.address,
     });
 
     return new Promise((resolve) => {
