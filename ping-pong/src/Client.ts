@@ -58,7 +58,7 @@ export class Client implements IClient {
   }
 
   ping(): Promise<number | false> {
-    const now = Date.now();
+    const start = Date.now();
 
     const socket = new Socket();
 
@@ -68,10 +68,12 @@ export class Client implements IClient {
     });
 
     return new Promise((resolve) => {
-      // If connect return milliseconds
-      // If error return false
-      socket.on('connect', resolve);
-      socket.on('error', )
+      const end = Date.now();
+      socket.on('connect', () => resolve(end - start));
+      socket.on('error', (err) => {
+        console.log(err)
+        resolve(false);
+      });
     });
   }
 }

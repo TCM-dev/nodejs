@@ -29,7 +29,7 @@ if (isServer) {
     });
 
     client.ping().then((delay) => {
-      console.log(delay + 'ms');
+      console.log(delay + ' ms');
     });
   } else {
     console.error('Please specify a correct IPv4 address');
