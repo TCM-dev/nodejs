@@ -1,47 +1,35 @@
+import cors from "cors";
 import express from "express";
 import http from "http";
 import { Server, Socket } from "socket.io";
-import { User, Users } from "./User";
-
-const users = new Users([]);
-
-const user = new User({
-  id: "1",
-  collection: users,
-});
-
-const user2 = new User({
-  id: "2",
-  collection: users,
-});
-
-users.add(user);
-users.add(user);
-users.add(user2);
-// users.del("1");
-
-// console.log(users.get("2"));
-
-// console.log('Début itérateur')
-
-// let iteration = users.next();
-
-// while (!iteration.done) {
-//   console.log(iteration.value);
-//   iteration = users.next();
-// }
+import { Room } from "./Room";
+import { User, UserCollection } from "./User";
+import { WSServer } from "./WSServer";
+import { v4 as uuidv4 } from "uuid";
 
 const app = express();
+app.use(cors());
+
 const httpServer = http.createServer(app);
-const wsServer = new Server(httpServer, {
-  cors: {
-    origin: "*",
-  },
+const wsServer = new WSServer({ httpSrv: httpServer });
+const home = new Room({
+  id: uuidv4(),
+  title: "Accueil",
+  usersCollection: wsServer.onlineUsers,
 });
+
+wsServer.rooms.add(home);
 
 const port = 8000;
 
 app.use("/", express.static("public"));
+
+// app.get("/rooms", (req, res) => {
+//   const rooms = wsServer.rooms.all
+//     .map((roomId) => wsServer.rooms.get(roomId))
+//     .filter((room) => room && room.public);
+//   res.json(rooms);
+// });
 
 // app.get("/bonjour/:prenom", (req, res) => {
 //   res.send(`Bonjour ${req.params.prenom}`);
@@ -52,19 +40,3 @@ httpServer.listen(port, () => {
 });
 
 // WEBSOCKET
-
-wsServer.on("connection", (socket: Socket) => {
-  console.log("User connected");
-
-  socket.on("message", (msg: string) => {
-    console.log("message: " + msg);
-    wsServer.emit("message", {
-      content: msg,
-      createdAt: new Date(),
-    });
-  });
-
-  socket.on("disconnect", () => {
-    console.log("User disconnected");
-  });
-});

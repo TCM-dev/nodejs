@@ -1,3 +1,5 @@
+import { IUser, IUserCollection, IUserConfig } from "./interfaces";
+
 export class User implements IUser {
   id: string;
   pseudo?: string | undefined;
@@ -28,7 +30,7 @@ export class User implements IUser {
   }
 }
 
-export class Users implements IUserCollection {
+export class UserCollection implements IUserCollection {
   private users: User[];
   private currentIndex: number = 0;
 

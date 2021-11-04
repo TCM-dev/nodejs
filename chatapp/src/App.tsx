@@ -1,47 +1,43 @@
-import React, { FormEvent, useEffect, useRef, useState } from "react";
-import logo from "./logo.svg";
+import React, {
+  FormEvent,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import "./App.css";
 import io, { Socket } from "socket.io-client";
+import { IMsg, IRoom } from "./interfaces";
+import axios from "axios";
 
-type User = {
-  id: number;
-  name: string;
-};
+// type User = {
+//   id: number;
+//   name: string;
+// };
 
-type Message = {
-  content: string;
-  user?: User;
-  createdAt: number;
-};
+// type Message = {
+//   content: string;
+//   user?: User;
+//   createdAt: number;
+// };
 
-function ChatBar() {
+function ChatBar({ send }: { send(message: string): void }) {
   const [text, settext] = useState("");
-  const [socket, setsocket] = useState<Socket>();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const newSocket = io("http://localhost:8000");
-    setsocket(newSocket);
-
     const handleFocus = (e: KeyboardEvent) => {
       if (inputRef.current === document.activeElement) {
         return;
       }
-
       inputRef.current?.focus();
     };
-
     document.addEventListener("keydown", handleFocus);
-
     return () => {
-      newSocket.disconnect();
       document.removeEventListener("keydown", handleFocus);
     };
   }, []);
-
-  const send = (message: string) => {
-    socket?.emit("message", message);
-  };
 
   const handleForm = (e: FormEvent) => {
     e.preventDefault();
@@ -73,25 +69,38 @@ function ChatBar() {
   );
 }
 
-function MessagesComponent() {
-  const [messages, setmessages] = useState<Message[]>([]);
+type MessagesComponentHandle = {
+  adjustScroll: () => void;
+};
+
+const MessagesComponent = forwardRef<
+  MessagesComponentHandle,
+  { messages: IMsg[] }
+>(({ messages }, ref) => {
+  // const [messages, setmessages] = useState<IMsg[]>([]);
   const messagesRef = useRef<HTMLDivElement>(null);
 
-  const addMessage = (message: Message) => {
-    setmessages((prevstate) => [...prevstate, message]);
+  // const addMessage = (message: IMsg) => {
+  //   setmessages((prevstate) => [...prevstate, message]);
 
-    messagesRef.current?.scrollTo(0, messagesRef.current.scrollHeight);
-  };
+  //   messagesRef.current?.scrollTo(0, messagesRef.current.scrollHeight);
+  // };
 
-  useEffect(() => {
-    const socket = io("http://localhost:8000");
+  useImperativeHandle(ref, () => ({
+    adjustScroll() {
+      messagesRef.current?.scrollTo(0, messagesRef.current.scrollHeight);
+    },
+  }));
 
-    socket.on("message", (message) => addMessage(message));
+  // useEffect(() => {
+  //   const socket = io("http://localhost:8000");
 
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
+  //   socket.on("message", (message) => addMessage(message));
+
+  //   return () => {
+  //     socket.disconnect();
+  //   };
+  // }, []);
 
   return (
     <div className="p-4 messages container-width" ref={messagesRef}>
@@ -100,11 +109,11 @@ function MessagesComponent() {
       ))}
     </div>
   );
-}
+});
 
-function MessageComponent({ message }: { message: Message }) {
-  const username = message.user?.name || "Anonymous";
-  const date = new Date(message.createdAt);
+function MessageComponent({ message }: { message: IMsg }) {
+  const username = message.userId || "Anonymous";
+  const date = new Date(message.timestamp || 0);
   const formattedDate = `${date.getHours()}:${date.getMinutes()} - ${date.getDate()}/${date.getMonth()}`;
 
   return (
@@ -115,12 +124,20 @@ function MessageComponent({ message }: { message: Message }) {
           {formattedDate}
         </span>
       </div>
-      <p className="text-gray-800">{message.content}</p>
+      <p className="text-gray-800">{message.msg}</p>
     </div>
   );
 }
 
-function Sidebar({ visible, toggle }: { visible: boolean; toggle(): void }) {
+function Sidebar({
+  visible,
+  toggle,
+  rooms,
+}: {
+  visible: boolean;
+  toggle(): void;
+  rooms: IRoom[];
+}) {
   return (
     <>
       <div
@@ -132,6 +149,11 @@ function Sidebar({ visible, toggle }: { visible: boolean; toggle(): void }) {
         <button onClick={toggle} className="text-gray-500 sidebar__toggle">
           Close menu
         </button>
+        {rooms.map((room) => (
+          <div className="rounded bg-gray-700 p-2 mt-2" key={room.id}>
+            {room.title}
+          </div>
+        ))}
       </div>
     </>
   );
@@ -147,16 +169,56 @@ function Header({ toggle }: { toggle(): void }) {
 
 function App() {
   const [visible, setvisible] = useState(false);
+  const [currentRoomId, setcurrentRoomId] = useState("");
+  const [rooms, setrooms] = useState<IRoom[]>([]);
+  const [messages, setmessages] = useState<IMsg[]>([]);
+  const [socket, setsocket] = useState<Socket>();
+  const messagesRef = useRef<MessagesComponentHandle>(null);
+
+  useEffect(() => {
+    // fetchRooms();
+  }, []);
+
+  const addMessage = (message: IMsg) => {
+    setmessages((prevstate) => [...prevstate, message]);
+
+    messagesRef.current?.adjustScroll();
+  };
+
+  const send = (message: string) => {
+    socket?.emit("message", message, currentRoomId);
+  };
+
+  useEffect(() => {
+    const socket = io("http://localhost:8000");
+    setsocket(socket);
+
+    socket.on("message", (message) => addMessage(message));
+    socket.on("rooms", (message) => {
+      const rooms = JSON.parse(message.msg).payload;
+      setrooms(rooms);
+      setcurrentRoomId(rooms[0].id);
+    });
+
+    // Fetch rooms once
+    socket.emit("rooms");
+    // socket.on("users", (message) => addMessage(message));
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   const toggle = () => setvisible((prevState) => !prevState);
 
   return (
     <div className="app">
       <div className="app__layout">
-        <Sidebar visible={visible} toggle={toggle} />
+        <Sidebar visible={visible} toggle={toggle} rooms={rooms} />
         <div className="app__chat">
-          <MessagesComponent />
-          <ChatBar />
+          Current room : {currentRoomId}
+          <MessagesComponent messages={messages} ref={messagesRef} />
+          <ChatBar send={send} />
         </div>
       </div>
       <Header toggle={toggle} />
