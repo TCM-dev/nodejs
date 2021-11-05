@@ -181,7 +181,6 @@ function App() {
     setsocket(socket);
 
     socket.on("message", (message) => addMessage(message));
-    socket.on("error message", (message) => addMessage(message));
 
     socket.on("rooms", (message) => {
       const rooms = JSON.parse(message.msg).payload;
