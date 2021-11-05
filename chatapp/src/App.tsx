@@ -1,6 +1,8 @@
 import React, {
+  Dispatch,
   FormEvent,
   forwardRef,
+  SetStateAction,
   useEffect,
   useImperativeHandle,
   useRef,
@@ -8,19 +10,7 @@ import React, {
 } from "react";
 import "./App.css";
 import io, { Socket } from "socket.io-client";
-import { IMsg, IRoom } from "./interfaces";
-import axios from "axios";
-
-// type User = {
-//   id: number;
-//   name: string;
-// };
-
-// type Message = {
-//   content: string;
-//   user?: User;
-//   createdAt: number;
-// };
+import { IMsg, IRoom, ServerMsg } from "./interfaces";
 
 function ChatBar({ send }: { send(message: string): void }) {
   const [text, settext] = useState("");
@@ -77,30 +67,13 @@ const MessagesComponent = forwardRef<
   MessagesComponentHandle,
   { messages: IMsg[] }
 >(({ messages }, ref) => {
-  // const [messages, setmessages] = useState<IMsg[]>([]);
   const messagesRef = useRef<HTMLDivElement>(null);
-
-  // const addMessage = (message: IMsg) => {
-  //   setmessages((prevstate) => [...prevstate, message]);
-
-  //   messagesRef.current?.scrollTo(0, messagesRef.current.scrollHeight);
-  // };
 
   useImperativeHandle(ref, () => ({
     adjustScroll() {
       messagesRef.current?.scrollTo(0, messagesRef.current.scrollHeight);
     },
   }));
-
-  // useEffect(() => {
-  //   const socket = io("http://localhost:8000");
-
-  //   socket.on("message", (message) => addMessage(message));
-
-  //   return () => {
-  //     socket.disconnect();
-  //   };
-  // }, []);
 
   return (
     <div className="p-4 messages container-width" ref={messagesRef}>
@@ -115,16 +88,24 @@ function MessageComponent({ message }: { message: IMsg }) {
   const username = message.userId || "Anonymous";
   const date = new Date(message.timestamp || 0);
   const formattedDate = `${date.getHours()}:${date.getMinutes()} - ${date.getDate()}/${date.getMonth()}`;
+  const msg = JSON.parse(message.msg);
 
   return (
     <div className="mt-4">
       <div className="flex items-baseline">
-        <span className="font-bold text-xl text-blue-900">{username}</span>
+        {msg.type === "message" ? (
+          <span className="font-bold text-xl text-blue-900">{username}</span>
+        ) : msg.type === "success" ? (
+          <span className="font-bold text-xl text-green-500">Server</span>
+        ) : (
+          <span className="font-bold text-xl text-red-900">Server</span>
+        )}
+
         <span className="text-sm text-gray-600 ml-2" title={date.toISOString()}>
           {formattedDate}
         </span>
       </div>
-      <p className="text-gray-800">{message.msg}</p>
+      <p className="text-gray-800">{msg.content}</p>
     </div>
   );
 }
@@ -133,10 +114,12 @@ function Sidebar({
   visible,
   toggle,
   rooms,
+  setcurrentRoomId,
 }: {
   visible: boolean;
-  toggle(): void;
   rooms: IRoom[];
+  toggle(): void;
+  setcurrentRoomId: Dispatch<SetStateAction<string>>;
 }) {
   return (
     <>
@@ -150,9 +133,13 @@ function Sidebar({
           Close menu
         </button>
         {rooms.map((room) => (
-          <div className="rounded bg-gray-700 p-2 mt-2" key={room.id}>
+          <button
+            className="rounded bg-gray-700 p-2 mt-2"
+            key={room.id}
+            onClick={() => setcurrentRoomId(room.id)}
+          >
             {room.title}
-          </div>
+          </button>
         ))}
       </div>
     </>
@@ -194,8 +181,11 @@ function App() {
     setsocket(socket);
 
     socket.on("message", (message) => addMessage(message));
+    socket.on("error message", (message) => addMessage(message));
+
     socket.on("rooms", (message) => {
       const rooms = JSON.parse(message.msg).payload;
+      console.log(rooms);
       setrooms(rooms);
       setcurrentRoomId(rooms[0].id);
     });
@@ -211,13 +201,22 @@ function App() {
 
   const toggle = () => setvisible((prevState) => !prevState);
 
+  const visibleMessages = messages.filter((message) => {
+    return message.roomId === currentRoomId;
+  });
+
   return (
     <div className="app">
       <div className="app__layout">
-        <Sidebar visible={visible} toggle={toggle} rooms={rooms} />
+        <Sidebar
+          visible={visible}
+          toggle={toggle}
+          rooms={rooms}
+          setcurrentRoomId={setcurrentRoomId}
+        />
         <div className="app__chat">
           Current room : {currentRoomId}
-          <MessagesComponent messages={messages} ref={messagesRef} />
+          <MessagesComponent messages={visibleMessages} ref={messagesRef} />
           <ChatBar send={send} />
         </div>
       </div>
